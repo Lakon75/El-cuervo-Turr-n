@@ -1,4 +1,4 @@
-<!doctype html>
+  <!doctype html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
@@ -28,7 +28,7 @@ canvas{width:100%;height:auto;background:#78c7ff;border-radius:18px;box-shadow:0
 
 <!-- PORTADA -->
 <div id="intro" class="overlay" role="dialog" aria-modal="true">
-  <img id="introImg" src="turran_moto.png?v=5" alt="Turrán en moto" onerror="this.style.display='none'">
+  <img id="introImg" src="turran_moto.png?v=6" alt="Turrán en moto" onerror="this.style.display='none'">
   <h1>EL CUERVO TURRÁN</h1>
   <button class="cta" id="startBtn">Comenzar</button>
 </div>
@@ -59,32 +59,90 @@ function fit(){ const w=document.getElementById('stage').clientWidth; canvas.wid
 addEventListener('resize',fit); addEventListener('orientationchange',fit); fit();
 
 /* ---------- Assets ---------- */
-const imgPlayer=new Image(); imgPlayer.src='turran_sprite.png?v=5';
+const imgPlayer=new Image(); imgPlayer.src='turran_sprite.png?v=6';
 const imgEnemy=new Image(); let enemyReady=false;
 (function findEnemy(){
   const list=['txibiri.png','txibiri.jpg','txibiri.jpeg','txibiri.webp'];
   (function tryNext(i=0){
     if(i>=list.length){enemyReady=false;return;}
-    const u=list[i]+'?v=5';
+    const u=list[i]+'?v=6';
     imgEnemy.onload=()=>enemyReady=true;
     imgEnemy.onerror=()=>tryNext(i+1);
     imgEnemy.src=u;
   })();
 })();
 
+/* ---------- Auto-slice del spritesheet (detecta huecos blancos) ---------- */
+let frames=[]; // cada frame: {x,y,w,h}
+imgPlayer.onload=()=>{
+  // pintar en un canvas offscreen
+  const off=document.createElement('canvas'), octx=off.getContext('2d',{willReadFrequently:true});
+  off.width=imgPlayer.width; off.height=imgPlayer.height;
+  octx.drawImage(imgPlayer,0,0);
+  const data=octx.getImageData(0,0,off.width,off.height).data;
+
+  // detectar columnas "vacías" (blancas / muy claras)
+  const isWhiteCol = (x)=>{
+    let white=0, total=off.height;
+    for(let y=0;y<off.height;y++){
+      const i=(y*off.width+x)*4;
+      const r=data[i],g=data[i+1],b=data[i+2],a=data[i+3];
+      if(a<10) { white++; continue; } // transparente = vacío
+      if(r>245&&g>245&&b>245) white++; // blanco ≈ vacío
+    }
+    return white/total > 0.95;
+  };
+
+  // partir por columnas vacías
+  let x=0;
+  while(x<off.width){
+    // saltar espacios
+    while(x<off.width && isWhiteCol(x)) x++;
+    if(x>=off.width) break;
+    let start=x;
+    while(x<off.width && !isWhiteCol(x)) x++;
+    let end=x; const w=end-start;
+
+    // altura útil (recortar arriba/abajo blancos)
+    let top=0,bottom=off.height-1;
+    // top
+    topLoop: for(let ty=0;ty<off.height;ty++){
+      for(let cx=start;cx<end;cx++){
+        const i=(ty*off.width+cx)*4, r=data[i],g=data[i+1],b=data[i+2],a=data[i+3];
+        if(a>10 && !(r>245&&g>245&&b>245)) { top=ty; break topLoop; }
+      }
+    }
+    // bottom
+    bottomLoop: for(let by=off.height-1;by>=0;by--){
+      for(let cx=start;cx<end;cx++){
+        const i=(by*off.width+cx)*4, r=data[i],g=data[i+1],b=data[i+2],a=data[i+3];
+        if(a>10 && !(r>245&&g>245&&b>245)) { bottom=by; break bottomLoop; }
+      }
+    }
+    const h=bottom-top+1;
+    frames.push({x:start,y:top,w,h});
+  }
+
+  // fallback si no detecta nada: asumir 4 frames iguales
+  if(frames.length===0){
+    const fw=Math.floor(off.width/4), fh=off.height;
+    for(let i=0;i<4;i++) frames.push({x:i*fw,y:0,w:fw,h:fh});
+  }
+};
+
 /* ---------- Estado ---------- */
 let started=false,running=false, t=0;
 let score=0,lives=3; const scoreEl=q('#score'), livesEl=q('#lives');
 let camX=0, groundY=Math.round(canvas.height*0.82);
-const G=0.55;
-const P={x:150,y:0,vx:0,vy:0,dir:1,onGround:true,anim:0,w:64,h:64,scale:3.2}; // SIEMPRE con margen a la izquierda
+const P={x:150,y:0,vx:0,vy:0,dir:1,onGround:true,anim:0,scale:3.2};
 const enemies=[], bubbles=[];
 function q(s){return document.querySelector(s);}
 function resetPlayer(){
   P.scale=Math.max(3.0, canvas.height/170);
   groundY=Math.round(canvas.height*0.82);
-  P.x=150; P.y=groundY-P.h*P.scale; P.vx=0; P.vy=0; P.onGround=true; P.dir=1; P.anim=0;
-  camX=0; // no empuja a la derecha
+  const fh = frames[0]?.h || 64;
+  P.y=groundY-fh*P.scale;
+  P.x=150; P.vx=0; P.vy=0; P.onGround=true; P.dir=1; P.anim=0; camX=0;
 }
 
 /* ---------- Controles ---------- */
@@ -108,14 +166,13 @@ function startMusic(){
   if(!AC||lead) return;
   const L=mk('square',0.06), B=mk('triangle',0.04); lead=L.o; bass=B.o;
   let i=0; const scale=[262,330,392,523,392,330,294,330];
-  (function loop(){
-    if(!lead) return;
-    const tt=AC.currentTime; lead.frequency.setValueAtTime(scale[i%scale.length],tt);
+  (function loop(){ if(!lead) return; const tt=AC.currentTime;
+    lead.frequency.setValueAtTime(scale[i%scale.length],tt);
     bass.frequency.setValueAtTime(110+((i>>2)%4)*14,tt); i++; setTimeout(loop,210);
   })();
 }
 function stopMusic(){ if(lead){try{lead.stop()}catch{}; lead.disconnect(); lead=null} if(bass){try{bass.stop()}catch{}; bass.disconnect(); bass=null} }
-q('#mute').onclick=()=>{ musicOn=!musicOn; q('#mute').textContent=musicOn?'🔊':'🔇'; if(!musicOn) stopMusic(); else if(started) startMusic(); }
+q('#mute').onclick=()=>{ musicOn=!musicOn; q('#mute').textContent=musicOn?'🔊':'🔇'; if(!musicOn) stopMusic(); else if(started) startMusic(); };
 document.addEventListener('visibilitychange',()=>{ if(document.hidden) stopMusic(); else if(started) startMusic(); });
 addEventListener('pagehide',stopMusic); addEventListener('beforeunload',stopMusic);
 
@@ -144,17 +201,18 @@ function update(){
   if(wantsJump && P.onGround){ P.vy=-11; P.onGround=false; say(P.x,P.y-20,'PARAPARAA!!'); }
 
   P.vy+=0.55; P.x+=P.vx; P.y+=P.vy;
-  const feet=P.y+P.h*P.scale;
-  if(feet>groundY){ P.y=groundY-P.h*P.scale; P.vy=0; P.onGround=true; }
+  const fh=frames[0]?.h||64;
+  const feet=P.y+fh*P.scale;
+  if(feet>groundY){ P.y=groundY-fh*P.scale; P.vy=0; P.onGround=true; }
 
-  /* Cámara con zona muerta: mantiene SIEMPRE margen a la izquierda */
+  // cámara con zona muerta (margen izq siempre)
   const leftEdge=140, rightEdge=Math.round(canvas.width*0.58);
   const px=P.x-camX;
   if(px>rightEdge) camX=P.x-rightEdge;
   if(px<leftEdge)  camX=P.x-leftEdge;
   if(camX<0) camX=0;
 
-  /* Enemigos: más lentos, grandes y lejos (para verlos venir) */
+  // enemigos
   nextEnemy--;
   if(nextEnemy<=0){
     const size=Math.round(96+Math.random()*56);
@@ -165,8 +223,9 @@ function update(){
   }
   for(const e of enemies) if(e.alive) e.x+=e.vx;
 
-  /* Colisiones */
-  const pr={x:P.x,y:P.y,w:P.w*P.scale,h:P.h*P.scale};
+  // colisiones
+  const pw=frames[0]?.w||64, ph=frames[0]?.h||64;
+  const pr={x:P.x,y:P.y,w:pw*P.scale,h:ph*P.scale};
   for(const e of enemies){
     if(!e.alive) continue;
     const er={x:e.x,y:e.y,w:e.w,h:e.h};
@@ -178,6 +237,9 @@ function update(){
 
   for(const b of bubbles){ b.age+=0.03; }
   while(bubbles.length && bubbles[0].age>2.2) bubbles.shift();
+
+  // anim
+  if(Math.abs(P.vx)>0.1) P.anim=(P.anim+0.2)% (frames.length||4);
 }
 
 function draw(){
@@ -194,7 +256,7 @@ function draw(){
   ctx.fillStyle=getCSS('--dirt'); ctx.fillRect(0,groundY-18,canvas.width,18);
   ctx.fillStyle=getCSS('--grass'); ctx.fillRect(0,groundY-28,canvas.width,10);
 
-  // enemigos (círculo con la foto si existe)
+  // enemigos
   for(const e of enemies){
     if(!e.alive) continue;
     const x=Math.floor(e.x-camX), y=e.y, r=e.w/2;
@@ -205,15 +267,15 @@ function draw(){
     }else{ ctx.fillStyle='#c33'; ctx.fillRect(x,y,e.w,e.h); }
   }
 
-  // Turrán (grande, sin cortarse)
-  if(imgPlayer.complete){
-    const fw=64,fh=64, sx=(P.anim%4)*fw, sy=0;
-    const dw=fw*P.scale, dh=fh*P.scale;
-    const screenX=Math.floor(P.x-camX);              // posición en pantalla
-    const dx = Math.max(0, screenX + (P.dir===-1?dw:0)); // evita dibujar fuera del lienzo
+  // Turrán (usando frames auto-recortados)
+  if(frames.length){
+    const f=frames[Math.floor(P.anim)%frames.length];
+    const dw=f.w*P.scale, dh=f.h*P.scale;
+    const screenX=Math.floor(P.x-camX);
+    const dx = Math.max(0, screenX + (P.dir===-1?dw:0));
     const dy = Math.floor(P.y);
     ctx.save(); ctx.translate(dx,dy); ctx.scale(P.dir,1);
-    ctx.drawImage(imgPlayer,sx,sy,fw,fh,0,0,dw,dh); ctx.restore();
+    ctx.drawImage(imgPlayer,f.x,f.y,f.w,f.h,0,0,dw,dh); ctx.restore();
   }
 
   // bocadillos
@@ -228,10 +290,7 @@ function draw(){
   t++;
 }
 function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name); }
-
 function frame(){ if(!running) return; update(); draw(); requestAnimationFrame(frame); }
-
-/* resize -> reubicar sin cortar */
 addEventListener('resize',()=>{ fit(); resetPlayer(); });
 </script>
 </body>

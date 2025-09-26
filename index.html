@@ -1,26 +1,26 @@
-  <!DOCTYPE html>
-<html lang="es"> 
+<!doctype html>
+<html lang="es">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <title>El cuervo Turrán</title>
 <style>
-  :root{--bg:#0b1220;--ink:#eaf2ff;--panel:#0f1830;--btn:#1f2b46;--jump:#2e7be6;--grass:#59cf63;--dirt:#6a4a35}
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,Segoe UI,Roboto,Arial}
-  #wrap{min-height:100%;display:flex;flex-direction:column;align-items:center;gap:10px;padding:10px}
-  #stage{width:100%;max-width:960px;display:flex;flex-direction:column;gap:12px;align-items:center}
-  canvas{width:100%;height:auto;background:#78c7ff;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
-  #hud{width:100%;max-width:960px;display:flex;justify-content:space-between;font-weight:700}
-  #pad{display:flex;gap:16px;justify-content:center;width:100%;max-width:960px}
-  #pad button{flex:0 0 auto;width:min(22vw,92px);height:min(22vw,92px);font-size:min(8vw,30px);border:0;border-radius:20px;background:var(--btn);color:#fff;box-shadow:0 8px 22px rgba(0,0,0,.25)}
-  #pad #jump{background:var(--jump)}
-  .overlay{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:16px;background:rgba(0,0,0,.92);z-index:20}
-  #intro h1{font-size:clamp(26px,6vw,48px);margin:10px 0 6px;text-align:center}
-  #intro img{max-width:min(92vw,560px);max-height:48vh;object-fit:contain;border-radius:14px;box-shadow:0 16px 36px rgba(0,0,0,.5)}
-  #intro .cta, #gameover .cta{font-size:clamp(18px,4.5vw,22px);padding:.8em 1.4em;border-radius:12px;border:0;background:#00c08a;color:#052516;box-shadow:0 10px 24px rgba(0,0,0,.35);margin-top:12px}
-  #gameover h1{font-size:clamp(28px,8vw,54px);color:#ff3a3a;margin:0 0 12px;text-align:center}
-  #mute{position:fixed;top:10px;right:10px;z-index:25;border:0;padding:8px 12px;border-radius:10px;background:#263455;color:#fff;opacity:.9}
+:root{--bg:#0b1220;--ink:#eaf2ff;--panel:#0f1830;--btn:#1f2b46;--jump:#2e7be6;--grass:#59cf63;--dirt:#6a4a35}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,Segoe UI,Roboto,Arial}
+#wrap{min-height:100%;display:flex;flex-direction:column;align-items:center;gap:10px;padding:12px}
+#hud{width:100%;max-width:980px;display:flex;justify-content:space-between;font-weight:800}
+#stage{width:100%;max-width:980px;display:flex;flex-direction:column;align-items:center;gap:12px}
+canvas{width:100%;height:auto;background:#78c7ff;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+#pad{display:flex;gap:16px;justify-content:center;width:100%}
+#pad button{width:min(22vw,92px);height:min(22vw,92px);border:0;border-radius:20px;background:var(--btn);color:#fff;font-size:min(8vw,30px);box-shadow:0 8px 22px rgba(0,0,0,.25)}
+#pad #jump{background:var(--jump)}
+.overlay{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:16px;background:rgba(0,0,0,.92);z-index:20}
+#intro img{max-width:min(92vw,560px);max-height:50vh;object-fit:contain;border-radius:14px;box-shadow:0 16px 36px rgba(0,0,0,.5);margin-bottom:10px}
+#intro h1{font-size:clamp(28px,7vw,52px);margin:0 0 12px}
+.cta{font-size:clamp(18px,4.5vw,22px);padding:.8em 1.4em;border-radius:12px;border:0;background:#00c08a;color:#052516;box-shadow:0 10px 24px rgba(0,0,0,.35)}
+#gameover h1{font-size:clamp(28px,8vw,54px);color:#ff3a3a;margin:0 0 12px;text-align:center}
+#mute{position:fixed;top:10px;right:10px;z-index:25;border:0;padding:8px 12px;border-radius:10px;background:#263455;color:#fff;opacity:.9}
 </style>
 </head>
 <body>
@@ -28,8 +28,7 @@
 
 <!-- PORTADA -->
 <div id="intro" class="overlay" role="dialog" aria-modal="true">
-  <!-- fuerza cargar turran_moto.png con anti-caché -->
-  <img id="introImg" src="turran_moto.png?v=1" alt="Turrán en moto" onerror="this.style.display='none'">
+  <img id="introImg" src="turran_moto.png?v=5" alt="Turrán en moto" onerror="this.style.display='none'">
   <h1>EL CUERVO TURRÁN</h1>
   <button class="cta" id="startBtn">Comenzar</button>
 </div>
@@ -40,12 +39,10 @@
   <button class="cta" id="againBtn">Reintentar</button>
 </div>
 
-<!-- JUEGO -->
 <div id="wrap">
   <div id="hud"><div>Plumas: <span id="score">0</span></div><div>Vidas: <span id="lives">3</span></div></div>
   <div id="stage">
-    <!-- 16:10: más alto -->
-    <canvas id="game" width="800" height="500"></canvas>
+    <canvas id="game" width="900" height="540"></canvas>
     <div id="pad">
       <button id="left" aria-label="Izquierda">◀</button>
       <button id="jump" aria-label="Saltar">⤒</button>
@@ -55,43 +52,46 @@
 </div>
 
 <script>
-/*** ----- Canvas responsive ----- ***/
-const canvas=document.getElementById('game'); const ctx=canvas.getContext('2d',{alpha:false});
-function fit(){ const s=document.getElementById('stage').clientWidth; const h=(s*10/16)|0; canvas.width=s; canvas.height=h; }
+/* ---------- Canvas responsive ---------- */
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d',{alpha:false});
+function fit(){ const w=document.getElementById('stage').clientWidth; canvas.width=w; canvas.height=Math.round(w*0.6); }
 addEventListener('resize',fit); addEventListener('orientationchange',fit); fit();
 
-/*** ----- Assets ----- ***/
-const imgPlayer=new Image(); imgPlayer.src='turran_sprite.png';
+/* ---------- Assets ---------- */
+const imgPlayer=new Image(); imgPlayer.src='turran_sprite.png?v=5';
 const imgEnemy=new Image(); let enemyReady=false;
-(function loadEnemy(){
-  const cand=['txibiri.png','txibiri.jpg','txibiri.jpeg','txibiri.webp'];
-  (function go(i=0){
-    if(i>=cand.length){enemyReady=false;return;}
-    const u=cand[i]+'?v='+(Date.now()%1000);
-    imgEnemy.onload=()=>enemyReady=true; imgEnemy.onerror=()=>go(i+1); imgEnemy.src=u;
+(function findEnemy(){
+  const list=['txibiri.png','txibiri.jpg','txibiri.jpeg','txibiri.webp'];
+  (function tryNext(i=0){
+    if(i>=list.length){enemyReady=false;return;}
+    const u=list[i]+'?v=5';
+    imgEnemy.onload=()=>enemyReady=true;
+    imgEnemy.onerror=()=>tryNext(i+1);
+    imgEnemy.src=u;
   })();
 })();
 
-/*** ----- Estado ----- ***/
-let started=false, running=false;
-let score=0, lives=3; const scoreEl=document.getElementById('score'), livesEl=document.getElementById('lives');
-let camX=0, t=0, nextEnemy=120;
-const enemies=[];
-const G=0.55; let groundY=Math.round(canvas.height*0.80);
-const P={x:80,y:0,vx:0,vy:0,dir:1,onGround:true,anim:0,w:64,h:64,scale:3.0}; // SIEMPRE a la IZQUIERDA
-
+/* ---------- Estado ---------- */
+let started=false,running=false, t=0;
+let score=0,lives=3; const scoreEl=q('#score'), livesEl=q('#lives');
+let camX=0, groundY=Math.round(canvas.height*0.82);
+const G=0.55;
+const P={x:150,y:0,vx:0,vy:0,dir:1,onGround:true,anim:0,w:64,h:64,scale:3.2}; // SIEMPRE con margen a la izquierda
+const enemies=[], bubbles=[];
+function q(s){return document.querySelector(s);}
 function resetPlayer(){
-  P.scale = Math.max(3.0, canvas.height/180);         // grande
-  groundY = Math.round(canvas.height*0.80);
-  P.x=80; P.y=groundY - P.h*P.scale; P.vx=0; P.vy=0; P.onGround=true; P.anim=0; P.dir=1;
-  camX=0;                                              // cámara empieza en 0 (no lo empuja a la derecha)
+  P.scale=Math.max(3.0, canvas.height/170);
+  groundY=Math.round(canvas.height*0.82);
+  P.x=150; P.y=groundY-P.h*P.scale; P.vx=0; P.vy=0; P.onGround=true; P.dir=1; P.anim=0;
+  camX=0; // no empuja a la derecha
 }
 
-/*** ----- Controles ----- ***/
+/* ---------- Controles ---------- */
 const k=Object.create(null), touch={left:false,right:false,jump:false};
 addEventListener('keydown',e=>k[e.key.toLowerCase()]=true);
 addEventListener('keyup',e=>k[e.key.toLowerCase()]=false);
-for(const id of ['left','right','jump']){
+for(const id of['left','right','jump']){
   const el=document.getElementById(id);
   el.addEventListener('touchstart',e=>{e.preventDefault();touch[id]=true;},{passive:false});
   el.addEventListener('touchend',e=>{e.preventDefault();touch[id]=false;},{passive:false});
@@ -99,105 +99,102 @@ for(const id of ['left','right','jump']){
   el.addEventListener('mouseup',()=>touch[id]=false);
 }
 
-/*** ----- Música 8-bit controlada ----- ***/
+/* ---------- Música chiptune simple ---------- */
 let AC=null, lead=null, bass=null, musicOn=true;
-function mkOsc(type,gain){ const o=AC.createOscillator(), g=AC.createGain(); o.type=type; g.gain.value=gain; o.connect(g).connect(AC.destination); o.start(); return {o,g}; }
+function mk(type,g){const o=AC.createOscillator(), a=AC.createGain();o.type=type;a.gain.value=g;o.connect(a).connect(AC.destination);o.start();return{o,a}}
 function startMusic(){
   if(!musicOn) return;
-  if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch{} }
+  if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)()}catch{}}
   if(!AC||lead) return;
-  const L=mkOsc('square',0.06); lead=L.o;
-  const B=mkOsc('triangle',0.04); bass=B.o;
-  let i=0; const scale=[262,330,392,440,392,330,294,330,392,349,330,294];
-  (function loop(){ if(!AC||!lead) return;
-    const n=scale[i%scale.length]; const tt=AC.currentTime;
-    lead.frequency.setValueAtTime(n,tt);
-    bass.frequency.setValueAtTime(110+((i>>2)%4)*14,tt);
-    i++; setTimeout(loop,230);
+  const L=mk('square',0.06), B=mk('triangle',0.04); lead=L.o; bass=B.o;
+  let i=0; const scale=[262,330,392,523,392,330,294,330];
+  (function loop(){
+    if(!lead) return;
+    const tt=AC.currentTime; lead.frequency.setValueAtTime(scale[i%scale.length],tt);
+    bass.frequency.setValueAtTime(110+((i>>2)%4)*14,tt); i++; setTimeout(loop,210);
   })();
 }
-function stopMusic(){ if(lead){try{lead.stop()}catch{}; lead.disconnect(); lead=null;} if(bass){try{bass.stop()}catch{}; bass.disconnect(); bass=null;} }
-document.getElementById('mute').addEventListener('click',()=>{ musicOn=!musicOn; document.getElementById('mute').textContent=musicOn?'🔊':'🔇'; if(!musicOn) stopMusic(); else if(started) startMusic(); });
+function stopMusic(){ if(lead){try{lead.stop()}catch{}; lead.disconnect(); lead=null} if(bass){try{bass.stop()}catch{}; bass.disconnect(); bass=null} }
+q('#mute').onclick=()=>{ musicOn=!musicOn; q('#mute').textContent=musicOn?'🔊':'🔇'; if(!musicOn) stopMusic(); else if(started) startMusic(); }
 document.addEventListener('visibilitychange',()=>{ if(document.hidden) stopMusic(); else if(started) startMusic(); });
 addEventListener('pagehide',stopMusic); addEventListener('beforeunload',stopMusic);
 
-/*** ----- UI ----- ***/
-document.getElementById('startBtn').addEventListener('click',()=>{ started=true; document.getElementById('intro').style.display='none';
-  score=0; lives=3; scoreEl.textContent=0; livesEl.textContent=3; resetWorld(); startMusic(); running=true; requestAnimationFrame(frame); });
-document.getElementById('againBtn').addEventListener('click',()=>{ document.getElementById('gameover').style.display='none';
-  score=0; lives=3; scoreEl.textContent=0; livesEl.textContent=3; resetWorld(); startMusic(); running=true; requestAnimationFrame(frame); });
-function resetWorld(){ enemies.length=0; nextEnemy=100; resetPlayer(); t=0; }
-function gameOver(){ running=false; stopMusic(); document.getElementById('gameover').style.display='flex'; }
+/* ---------- UI ---------- */
+q('#startBtn').onclick=()=>{ started=true; q('#intro').style.display='none'; score=0;lives=3;scoreEl.textContent=0;livesEl.textContent=3; resetWorld(); startMusic(); running=true; requestAnimationFrame(frame); };
+q('#againBtn').onclick=()=>{ q('#gameover').style.display='none'; score=0;lives=3;scoreEl.textContent=0;livesEl.textContent=3; resetWorld(); startMusic(); running=true; requestAnimationFrame(frame); };
+addEventListener('keydown',e=>{ if(!started&&(e.key===' '||e.key==='Enter'||e.key==='ArrowUp')) q('#startBtn').click(); });
 
-/*** ----- Util ----- ***/
+function resetWorld(){ enemies.length=0; nextEnemy=120; resetPlayer(); t=0; }
+function gameOver(){ running=false; stopMusic(); q('#gameover').style.display='flex'; }
+
+/* ---------- Util ---------- */
 function say(x,y,txt){ bubbles.push({x,y,text:txt,age:0}); }
-const bubbles=[]; function rects(a,b){ return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y; }
+function rects(a,b){return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y}
 
-/*** ----- Update ----- ***/
+/* ---------- Update / Draw ---------- */
+let nextEnemy=120;
 function update(){
   const left = k['arrowleft']||k['a']||touch.left;
   const right= k['arrowright']||k['d']||touch.right;
-  const wantJump = k[' ']||k['w']||k['arrowup']||touch.jump;
-  const SPEED = 3.2;
+  const wantsJump = k[' ']||k['w']||k['arrowup']||touch.jump;
+  const SPEED=3.2;
 
-  P.vx = (right?SPEED:0) - (left?SPEED:0);
+  P.vx=(right?SPEED:0)-(left?SPEED:0);
   if(left) P.dir=-1; if(right) P.dir=1;
-  if(wantJump && P.onGround){ P.vy=-11; P.onGround=false; say(P.x,P.y-20,'PARAPARAA!!'); }
+  if(wantsJump && P.onGround){ P.vy=-11; P.onGround=false; say(P.x,P.y-20,'PARAPARAA!!'); }
 
-  P.vy += G; P.x += P.vx; P.y += P.vy;
-  const feet=P.y + P.h*P.scale;
-  if(feet>groundY){ P.y=groundY - P.h*P.scale; P.vy=0; P.onGround=true; }
+  P.vy+=0.55; P.x+=P.vx; P.y+=P.vy;
+  const feet=P.y+P.h*P.scale;
+  if(feet>groundY){ P.y=groundY-P.h*P.scale; P.vy=0; P.onGround=true; }
 
-  /* CÁMARA CON ZONA MUERTA:
-     - No sigue al jugador hasta que éste supere el 55% de la pantalla.
-     - Nunca deja al jugador más a la derecha del 65% ni más a la izquierda del 30%. */
-  const leftEdge = 0.30*canvas.width;
-  const rightEdge= 0.55*canvas.width;
-  const px = P.x - camX;
-  if(px>rightEdge) camX = P.x - rightEdge;
-  if(px<leftEdge)  camX = P.x - leftEdge;
+  /* Cámara con zona muerta: mantiene SIEMPRE margen a la izquierda */
+  const leftEdge=140, rightEdge=Math.round(canvas.width*0.58);
+  const px=P.x-camX;
+  if(px>rightEdge) camX=P.x-rightEdge;
+  if(px<leftEdge)  camX=P.x-leftEdge;
   if(camX<0) camX=0;
 
-  // Enemigos grandes, más lentos y más lejos (para verlos venir)
+  /* Enemigos: más lentos, grandes y lejos (para verlos venir) */
   nextEnemy--;
   if(nextEnemy<=0){
-    const size = Math.round(96 + Math.random()*56);
-    const dist = canvas.width + 220 + Math.random()*220;
-    const vel  = -(1.2 + Math.random()*1.2);
-    enemies.push({x:camX + dist, y:groundY - size, w:size, h:size, vx:vel, alive:true});
-    nextEnemy = 110 + (Math.random()*120|0);
+    const size=Math.round(96+Math.random()*56);
+    const dist=canvas.width+260+Math.random()*260;
+    const vel=-(1.2+Math.random()*1.2);
+    enemies.push({x:camX+dist,y:groundY-size,w:size,h:size,vx:vel,alive:true});
+    nextEnemy=120+(Math.random()*120|0);
   }
-  for(const e of enemies) if(e.alive) e.x += e.vx;
+  for(const e of enemies) if(e.alive) e.x+=e.vx;
 
-  // Colisiones
+  /* Colisiones */
   const pr={x:P.x,y:P.y,w:P.w*P.scale,h:P.h*P.scale};
   for(const e of enemies){
     if(!e.alive) continue;
     const er={x:e.x,y:e.y,w:e.w,h:e.h};
     if(rects(pr,er)){
       if(P.vy>1){ e.alive=false; score+=10; scoreEl.textContent=score; P.vy=-8; say(e.x,e.y-10,'¡AY!'); }
-      else { lives--; livesEl.textContent=lives; say(P.x,P.y-16,'¡AU!'); P.x-=28; P.vy=-7; if(lives<=0){ gameOver(); } }
+      else { lives--; livesEl.textContent=lives; say(P.x,P.y-16,'¡AU!'); P.x-=28; P.vy=-7; if(lives<=0) gameOver(); }
     }
   }
 
-  for(const b of bubbles) b.age+=0.03; while(bubbles.length && bubbles[0].age>2.2) bubbles.shift();
+  for(const b of bubbles){ b.age+=0.03; }
+  while(bubbles.length && bubbles[0].age>2.2) bubbles.shift();
 }
 
-/*** ----- Draw ----- ***/
 function draw(){
   // cielo
-  const g=ctx.createLinearGradient(0,0,0,canvas.height);
-  g.addColorStop(0,'#8fd1ff'); g.addColorStop(1,'#58aaf0'); ctx.fillStyle=g; ctx.fillRect(0,0,canvas.width,canvas.height);
+  const g=ctx.createLinearGradient(0,0,0,canvas.height); g.addColorStop(0,'#8fd1ff'); g.addColorStop(1,'#58aaf0');
+  ctx.fillStyle=g; ctx.fillRect(0,0,canvas.width,canvas.height);
   // nubes
   ctx.fillStyle='rgba(255,255,255,.95)';
-  for(let i=0;i<5;i++){ const x=((i*240 + (t*0.35)) - camX*0.1)%(canvas.width+320)-160; const y=50+(i%3)*30;
-    ctx.beginPath(); ctx.ellipse(x,y,42,18,0,0,7); ctx.ellipse(x+28,y+6,34,14,0,0,7); ctx.fill();
+  for(let i=0;i<5;i++){ const x=((i*260 + (t*0.35)) - camX*0.1)%(canvas.width+320)-160; const y=50+(i%3)*30;
+    ctx.beginPath(); ctx.ellipse(x,y,44,18,0,0,7); ctx.ellipse(x+30,y+6,34,14,0,0,7); ctx.fill();
   }
   // suelo
-  ctx.fillStyle=getCSS('--dirt'); ctx.fillRect(0,Math.round(canvas.height*0.80)-16,canvas.width,16);
-  ctx.fillStyle=getCSS('--grass'); ctx.fillRect(0,Math.round(canvas.height*0.80)-26,canvas.width,10);
+  const groundY=Math.round(canvas.height*0.82);
+  ctx.fillStyle=getCSS('--dirt'); ctx.fillRect(0,groundY-18,canvas.width,18);
+  ctx.fillStyle=getCSS('--grass'); ctx.fillRect(0,groundY-28,canvas.width,10);
 
-  // enemigos (txíbiri en círculo si existe)
+  // enemigos (círculo con la foto si existe)
   for(const e of enemies){
     if(!e.alive) continue;
     const x=Math.floor(e.x-camX), y=e.y, r=e.w/2;
@@ -208,18 +205,19 @@ function draw(){
     }else{ ctx.fillStyle='#c33'; ctx.fillRect(x,y,e.w,e.h); }
   }
 
-  // Turrán (grande y sin cortarse)
+  // Turrán (grande, sin cortarse)
   if(imgPlayer.complete){
-    const fw=64, fh=64, sx=(P.anim%4)*fw, sy=0;
+    const fw=64,fh=64, sx=(P.anim%4)*fw, sy=0;
     const dw=fw*P.scale, dh=fh*P.scale;
-    const dx=Math.floor(P.x - camX) + (P.dir===-1?dw:0), dy=Math.floor(P.y);
+    const screenX=Math.floor(P.x-camX);              // posición en pantalla
+    const dx = Math.max(0, screenX + (P.dir===-1?dw:0)); // evita dibujar fuera del lienzo
+    const dy = Math.floor(P.y);
     ctx.save(); ctx.translate(dx,dy); ctx.scale(P.dir,1);
-    ctx.drawImage(imgPlayer, sx, sy, fw, fh, 0, 0, dw, dh);
-    ctx.restore();
+    ctx.drawImage(imgPlayer,sx,sy,fw,fh,0,0,dw,dh); ctx.restore();
   }
 
   // bocadillos
-  ctx.font='bold 24px system-ui,Segoe UI,Roboto'; ctx.textBaseline='top';
+  ctx.font='bold 24px system-ui,Segoe UI,Roboto';
   for(const b of bubbles){
     const alpha=Math.max(0,1-(b.age-0.6)/1.2); ctx.globalAlpha=alpha;
     const x=Math.floor(b.x-camX), y=Math.floor(b.y-42-b.age*22), w=ctx.measureText(b.text).width+18;
@@ -231,14 +229,10 @@ function draw(){
 }
 function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name); }
 
-/*** ----- Bucle ----- ***/
 function frame(){ if(!running) return; update(); draw(); requestAnimationFrame(frame); }
 
-/*** ----- Ajustes tras rotación ----- ***/
+/* resize -> reubicar sin cortar */
 addEventListener('resize',()=>{ fit(); resetPlayer(); });
-
-/*** ----- Arranque rápido con teclado ----- ***/
-addEventListener('keydown',e=>{ if(!started&&(e.key===' '||e.key==='Enter'||e.key==='ArrowUp')) document.getElementById('startBtn').click(); });
 </script>
 </body>
 </html>

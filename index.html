@@ -1,264 +1,184 @@
-        <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>El cuervo Turrán</title>
 <style>
-  :root{--bg:#0b1220;--ink:#e6edf7;--btn:#1f2b46;--jump:#2f6dd2;}
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,Segoe UI,Roboto}
-  #wrap{display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;padding:8px}
-  canvas{background:#6fbaff;border-radius:16px;width:100%;max-width:900px;touch-action:none}
-  #hud{display:flex;gap:16px;align-items:center;font-weight:700}
-  #pad{position:fixed;left:0;right:0;bottom:calc(12px + env(safe-area-inset-bottom));display:none;justify-content:space-between;align-items:center;padding:0 14px;gap:12px;z-index:10}
-  #pad button{font-size:22px;width:84px;height:84px;border-radius:18px;border:0;opacity:.96;box-shadow:0 8px 18px rgba(0,0,0,.25)}
-  #left,#right{background:var(--btn);color:#fff} #jump{background:var(--jump);color:#fff}
-
-  /* Overlay de título con la moto */
-  #title{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:14px;color:#fff;text-align:center;background:linear-gradient(90deg,rgba(0,0,0,.55),rgba(0,0,0,.15));z-index:20}
-  #title::before{
-    content:"";
-    position:absolute; inset:0;
-    background-image:url('title_turran.png');
-    background-repeat:no-repeat;
-    background-size:contain;           /* que encaje bien */
-    background-position:right center;  /* moto a la derecha */
-    opacity:1; z-index:-1;
-  }
-  #title h1{margin:0 16px;font-size:44px;letter-spacing:.5px;text-shadow:0 3px 0 #0b1220}
-  #title p{margin:0 16px;max-width:680px;opacity:.95}
-  #title button{margin-top:6px;font-size:18px;padding:12px 18px;border-radius:12px;border:0;background:#00b37e;color:#071b12;box-shadow:0 10px 20px rgba(0,0,0,.25)}
+  body { margin:0; background:#111; display:flex; justify-content:center; align-items:center; height:100vh; }
+  #game { background:#6ec6ff; display:block; margin:auto; border:4px solid #000; border-radius:10px; }
+  #pad { position:fixed; bottom:20px; left:0; right:0; display:flex; justify-content:center; gap:20px; }
+  #pad button { width:80px; height:80px; font-size:32px; border-radius:20px; border:none; background:#333; color:white; }
+  #intro, #gameover { position:fixed; top:0; left:0; right:0; bottom:0; display:flex; flex-direction:column; justify-content:center; align-items:center; background:#000; color:#fff; font-family:sans-serif; }
+  #intro h1 { font-size:48px; margin-bottom:20px; }
+  #intro img { max-width:300px; border-radius:12px; margin-bottom:20px; }
+  #intro button { padding:10px 20px; font-size:24px; }
+  #gameover h1 { font-size:48px; color:red; }
 </style>
 </head>
 <body>
-<div id="wrap">
-  <div id="hud">Plumas: <span id="score">0</span> · Vidas: <span id="lives">3</span></div>
-  <div id="title">
-    <h1>EL CUERVO TURRÁN</h1>
-    <p>Toca la pantalla para empezar. Salta torpe “<b>PARAPARAA!!</b>”, esquiva bitxos y cae encima para ganar puntos.</p>
-    <button id="startBtn" type="button">Tocar para empezar</button>
-  </div>
-  <canvas id="game" width="640" height="360"></canvas>
+<div id="intro">
+  <h1>🐦 El cuervo Turrán 🐦</h1>
+  <img src="turran_moto.png" alt="Turrán en moto">
+  <button onclick="startGame()">Comenzar</button>
 </div>
-<div id="pad">
-  <button id="left">◄</button>
-  <button id="jump">⤒</button>
-  <button id="right">►</button>
+
+<canvas id="game" width="800" height="400"></canvas>
+
+<div id="pad" style="display:none;">
+  <button id="left">◀</button>
+  <button id="jump">⬆</button>
+  <button id="right">▶</button>
+</div>
+
+<div id="gameover" style="display:none;">
+  <h1>Game Over – Esto y lo Otro</h1>
+  <button onclick="restartGame()">Reintentar</button>
 </div>
 
 <script>
-/* ====== CONFIG ====== */
-const SPRITE_URL = "turran_sprite.png";
-const ENEMY_URL  = "enemy.png";     // opcional (cara)
-const SCALE_P = 4.0;                // Turrán MUY grande (64x64 * 4 = 256px)
-const ENEMY_SIZE = 96;              // enemigo grande
-const G=0.55, CAM_LERP=0.1, groundY=300;
-const SPEED_MIN=2.3, SPEED_MAX=3.8; // velocidad variable
-const JUMP_BASE=-11.0;              // salto base
+// ====== CONFIG ======
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const SCALE_P = 3;
+let keys = {};
+let player, enemies, camX, running, gameOver;
+let score = 0;
 
-/* ====== SETUP ====== */
-const canvas=document.getElementById('game');
-const ctx=canvas.getContext('2d',{alpha:false});
-const scoreEl=document.getElementById('score');
-const livesEl=document.getElementById('lives');
-const overlay=document.getElementById('title');
-const pad=document.getElementById('pad');
-function fit(){const s=Math.min(innerWidth/canvas.width,(innerHeight-170)/canvas.height);canvas.style.width=(canvas.width*s)+'px';canvas.style.height=(canvas.height*s)+'px';}
-addEventListener('resize',fit); fit();
+// ====== SPRITES ======
+const imgPlayer = new Image();
+imgPlayer.src = "turran_sprite.png";
 
-/* ====== ASSETS ====== */
-const imgPlayer=new Image(); imgPlayer.src=SPRITE_URL;
-const imgEnemy=new Image(); let enemyReady=false;
-imgEnemy.onload=()=>enemyReady=true;
-imgEnemy.onerror=()=>enemyReady=false;
-imgEnemy.src=ENEMY_URL;
+const imgEnemy = new Image();
+imgEnemy.src = "txibiri.png"; // tu foto recortada
 
-/* ====== INPUT ====== */
-const k=Object.create(null), touch={left:false,right:false,jump:false};
-addEventListener('keydown',e=>k[e.key.toLowerCase()]=true);
-addEventListener('keyup',e=>k[e.key.toLowerCase()]=false);
-for(const id of ['left','right','jump']){
-  const el=document.getElementById(id);
-  el.addEventListener('touchstart',e=>{e.preventDefault();touch[id]=true;},{passive:false});
-  el.addEventListener('touchend',e=>{e.preventDefault();touch[id]=false;},{passive:false});
-  el.addEventListener('touchcancel',e=>{e.preventDefault();touch[id]=false;},{passive:false});
+// ====== MUSICA ======
+let music;
+function playMusic(){
+  if(!music){
+    const audio = new Audio("data:audio/mp3;base64,//uQZAAAAAAAA...");
+    audio.loop = true;
+    audio.volume = 0.3;
+    audio.play();
+    music = audio;
+  }
 }
 
-/* ====== AUDIO fiable ====== */
-let AC=null, osc=null, beat=null, seqT=0, started=false;
-function startMusic(){
-  try{
-    if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)();
-    AC.resume?.();
-    if(osc) return;
-    osc=AC.createOscillator(); beat=AC.createOscillator();
-    const g1=AC.createGain(), g2=AC.createGain(); g1.gain.value=0.06; g2.gain.value=0.025;
-    osc.type='square'; beat.type='triangle';
-    osc.connect(g1); beat.connect(g2); g1.connect(AC.destination); g2.connect(AC.destination);
-    osc.start(); beat.start();
-    const notes=[262,330,392,523,392,330,294,330,392,440,392,330]; // pegadizo
-    (function loop(){
-      if(!AC) return;
-      const i=Math.floor(seqT)%notes.length;
-      osc.frequency.setValueAtTime(notes[i],AC.currentTime);
-      beat.frequency.setValueAtTime(110+(i%4)*20,AC.currentTime);
-      seqT+=0.5; setTimeout(loop,220);
-    })();
-  }catch(e){}
+// ====== JUGADOR ======
+function resetPlayer(){
+  player = {x:100,y:300,vx:0,vy:0,w:64,h:64,dir:1,anim:0,onGround:false};
 }
-function begin(){
-  if(started) return;
-  started=true; overlay.style.display='none'; pad.style.display='flex'; startMusic();
+
+// ====== ENEMIGOS ======
+function spawnEnemy(){
+  enemies.push({x:camX+canvas.width+100,y:320,alive:true});
 }
-// arranque por cualquier interacción
-document.getElementById('startBtn').addEventListener('click',begin);
-overlay.addEventListener('pointerdown',begin);
-canvas.addEventListener('pointerdown',()=>{if(!started) begin();});
-document.addEventListener('keydown',()=>{if(!started) begin();});
-document.addEventListener('pointerdown',()=>{if(!started) begin();},{capture:true});
 
-/* ====== WORLD ====== */
-let camX=0, score=0, lives=3, gameOver=false, tGlobal=0;
-let runSpeed = (SPEED_MIN+SPEED_MAX)/2;
-setInterval(()=>{ runSpeed = SPEED_MIN + Math.random()*(SPEED_MAX-SPEED_MIN); }, 2500);
-
-const particles=[], bubbles=[], clouds=[], mountains=[];
-for(let i=0;i<8;i++) clouds.push({x:Math.random()*1200, y:40+Math.random()*100, s:0.3+Math.random()*0.5});
-for(let i=0;i<6;i++) mountains.push({x:Math.random()*1600, h:60+Math.random()*80, s:0.1+Math.random()*0.2});
-
-const P={x:40,y:groundY-64,w:64*SCALE_P,h:64*SCALE_P,vx:0,vy:0,onGround:true,dir:1,anim:0,walkT:0};
-function puff(x,y){particles.push({x,y,vx:(Math.random()-0.5)*1.2,vy:-1.2,a:0.9,r:2+Math.random()*2});}
-function say(x,y,txt){bubbles.push({x,y,t:0,text:txt});}
-
-const enemies=[]; let nextEnemy=140;
-function spawnEnemy(x){
-  const base=0.9 + Math.random()*1.8;        // 0.9–2.7
-  const dash=Math.random()<0.2 ? 1.6 : 1.0;   // 20% más rápidos
-  enemies.push({x,y:groundY-ENEMY_SIZE,w:ENEMY_SIZE,h:ENEMY_SIZE,vx:-(base*dash),alive:true});
+// ====== GAME ======
+function startGame(){
+  document.getElementById("intro").style.display="none";
+  document.getElementById("pad").style.display="flex";
+  resetPlayer();
+  enemies=[];
+  camX=0; running=true; gameOver=false; score=0;
+  playMusic();
+  loop();
 }
-function rects(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
 
-/* ====== UPDATE ====== */
+function restartGame(){
+  document.getElementById("gameover").style.display="none";
+  startGame();
+}
+
+// ====== INPUT ======
+document.addEventListener("keydown",e=>keys[e.key]=true);
+document.addEventListener("keyup",e=>keys[e.key]=false);
+
+document.getElementById("left").onmousedown=()=>keys["ArrowLeft"]=true;
+document.getElementById("right").onmousedown=()=>keys["ArrowRight"]=true;
+document.getElementById("jump").onmousedown=()=>keys["ArrowUp"]=true;
+document.querySelectorAll("#pad button").forEach(b=>b.onmouseup=()=>keys[b.id==="left"?"ArrowLeft":b.id==="right"?"ArrowRight":"ArrowUp"]=false);
+
+// ====== LOOP ======
+function loop(){
+  if(!running) return;
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ====== UPDATE ======
 function update(){
-  if(!started || gameOver) return;
+  // movimiento jugador
+  if(keys["ArrowLeft"]) player.vx=-3;
+  else if(keys["ArrowRight"]) player.vx=3;
+  else player.vx=0;
 
-  const left = k['arrowleft']||k['a']||touch.left;
-  const right= k['arrowright']||k['d']||touch.right;
-  const wantJump = k[' ']||k['w']||k['arrowup']||touch.jump;
-
-  P.vx = (right?runSpeed:0) - (left?runSpeed:0);
-  if(left) P.dir=-1; if(right) P.dir=1;
-
-  if(wantJump && P.onGround){
-    const jitter = -(Math.random()*1.2);
-    P.vy = JUMP_BASE + jitter;
-    P.onGround=false;
-    say(P.x+P.w/2, P.y-12, "PARAPARAA!!");
-  }else if(wantJump && !P.onGround && P.vy>-2){
-    P.vy += -0.65*0.4; // aleteo torpe
+  if(keys["ArrowUp"] && player.onGround){
+    player.vy=-10; player.onGround=false;
   }
 
-  P.vy += G; P.x += P.vx; P.y += P.vy;
-  if(P.y+P.h>groundY){ P.y=groundY-P.h; if(!P.onGround) puff(P.x+P.w/2, groundY-2); P.vy=0; P.onGround=true; }
+  player.vy+=0.5;
+  player.x+=player.vx;
+  player.y+=player.vy;
+  if(player.y>=320){ player.y=320; player.vy=0; player.onGround=true; }
 
-  // anim
-  if(!P.onGround) P.anim = P.vy<-1?2:3;
-  else if(P.vx!==0){ P.anim=1; P.walkT+=0.18; if(Math.sin(P.walkT)>0.92) puff(P.x+P.w/2, groundY-2); }
-  else P.anim=0;
-
-  // cámara
-  camX += ((P.x-220)-camX)*CAM_LERP;
+  camX=player.x-100;
 
   // enemigos
-  nextEnemy--; if(nextEnemy<=0){ spawnEnemy(camX+640+Math.random()*220); nextEnemy=120+(Math.random()*120|0); }
+  if(Math.random()<0.02) spawnEnemy();
+  enemies.forEach(e=>{ e.x-=3; });
+
+  // colisiones
   for(const e of enemies){
-    if(!e.alive) continue; e.x+=e.vx;
-    if(rects(P,e)){
-      if(P.vy>1){ e.alive=false; score+=10; scoreEl.textContent=score; P.vy=JUMP_BASE*0.45; say(e.x,e.y-8,"¡AY!"); }
-      else{ lives--; livesEl.textContent=lives; say(P.x,P.y-16,"¡AU!"); P.x-=32; P.vy=-7; if(lives<=0){ gameOver=true; say(P.x,P.y-28,"GAME OVER"); } }
+    if(e.alive &&
+       player.x<e.x+48 && player.x+48>e.x &&
+       player.y<e.y+48 && player.y+48>e.y){
+      gameOver=true; running=false;
+      document.getElementById("gameover").style.display="flex";
     }
   }
-
-  // burbujas y partículas
-  for(const b of bubbles) b.t+=0.03; while(bubbles.length&&bubbles[0].t>2.6) bubbles.shift();
-  for(const p of particles){ p.x+=p.vx; p.y+=p.vy; p.a-=0.03; p.vy+=0.05; }
-  while(particles.length&&particles[0].a<=0) particles.shift();
-
-  tGlobal++;
 }
 
-/* ====== DRAW ====== */
+// ====== DRAW ======
 function draw(){
-  // cielo
-  const grd=ctx.createLinearGradient(0,0,0,canvas.height);
-  grd.addColorStop(0,'#86d3ff'); grd.addColorStop(1,'#5aa8f0');
-  ctx.fillStyle=grd; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle="#6ec6ff";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  // montañas
-  for(const m of mountains){ const x=((m.x - camX*m.s)%1200+1200)%1200 - 200;
-    ctx.fillStyle='#6fa4c9'; ctx.beginPath(); ctx.moveTo(x,groundY-8); ctx.lineTo(x+140,groundY-8); ctx.lineTo(x+70,groundY-8-m.h); ctx.closePath(); ctx.fill(); }
+  // suelo
+  ctx.fillStyle="#654321";
+  ctx.fillRect(0,360,canvas.width,40);
 
-  // nubes
-  ctx.fillStyle='rgba(255,255,255,.9)';
-  for(const c of clouds){ c.x+=c.s*0.3; const x=((c.x - camX*c.s)%1000+1000)%1000;
-    ctx.beginPath(); ctx.ellipse(x, c.y, 40,18,0,0,Math.PI*2); ctx.ellipse(x+28,c.y+4,32,14,0,0,Math.PI*2); ctx.fill(); }
-
-  // suelo texturizado
-  const start=Math.floor(camX/32)*32-64;
-  for(let x=start;x<camX+canvas.width+64;x+=32){
-    ctx.fillStyle='#6d5139'; ctx.fillRect(Math.floor(x-camX), groundY-16, 32, 16);
-    ctx.fillStyle='#5a452f'; for(let i=0;i<4;i++){ ctx.fillRect(Math.floor(x-camX)+i*8+Math.sin((x+i*50)*0.1+tGlobal*0.05)*1, groundY-8, 4, 8); }
-    ctx.fillStyle='#4ea046'; ctx.fillRect(Math.floor(x-camX), groundY-24, 32, 8);
-    ctx.fillStyle='#6fd35a'; for(let i=0;i<4;i++){ ctx.fillRect(Math.floor(x-camX)+i*8, groundY-26, 6, 2); }
-  }
-
-  // partículas
-  for(const p of particles){ ctx.globalAlpha=Math.max(0,p.a); ctx.fillStyle='#353535'; ctx.fillRect(Math.floor(p.x-camX), Math.floor(p.y), p.r, p.r); ctx.globalAlpha=1; }
-
-  // enemigos
-  for(const e of enemies){
-    if(!e.alive) continue; const x=Math.floor(e.x-camX);
-    if(enemyReady){
-      ctx.save();
-      ctx.beginPath(); ctx.arc(x+ENEMY_SIZE/2, e.y+ENEMY_SIZE/2, ENEMY_SIZE/2, 0, Math.PI*2); ctx.clip();
-      ctx.drawImage(imgEnemy, x, e.y, ENEMY_SIZE, ENEMY_SIZE);
-      ctx.restore();
-      ctx.strokeStyle='#fff'; ctx.lineWidth=3;
-      ctx.beginPath(); ctx.arc(x+ENEMY_SIZE/2, e.y+ENEMY_SIZE/2, ENEMY_SIZE/2, 0, Math.PI*2); ctx.stroke();
-    }else{
-      ctx.fillStyle='#262b3a'; ctx.fillRect(x,e.y,ENEMY_SIZE,ENEMY_SIZE);
-      ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(x+ENEMY_SIZE*0.65, e.y+ENEMY_SIZE*0.33, ENEMY_SIZE*0.08, 0, Math.PI*2); ctx.fill();
-    }
-  }
-
-  // Turrán (GRANDE y sin recortes)
+  // jugador
   if(imgPlayer.complete){
-    const fw=64, fh=64, dw=fw*SCALE_P, dh=fh*SCALE_P; // 256x256
-    const sx=P.anim*fw, sy=0;
+    const fw=64,fh=64;
+    const sx=0,sy=0;
+    const dw=fw*SCALE_P,dh=fh*SCALE_P;
+    const dx=Math.floor(player.x-camX),dy=player.y-dh+fh;
     ctx.save();
-    ctx.translate(Math.floor(P.x-camX) + (P.dir===-1?dw:0), Math.floor(P.y)); // sin restar DH para que no se corte
-    ctx.scale(P.dir,1);
-    ctx.drawImage(imgPlayer, sx, sy, fw, fh, 0, 0, dw, dh);
+    ctx.translate(dx+(player.dir===-1?dw:0),dy);
+    ctx.scale(player.dir,1);
+    ctx.drawImage(imgPlayer,sx,sy,fw,fh,0,0,dw,dh);
     ctx.restore();
   }
 
-  // bocadillos GRANDES
-  ctx.font='bold 22px system-ui, Segoe UI, Roboto';
-  ctx.textBaseline='top';
-  for(const b of bubbles){
-    const x=Math.floor(b.x-camX), y=Math.floor(b.y - 36 - b.t*24), pad=10;
-    const w=ctx.measureText(b.text).width+pad*2, h=34;
-    ctx.save(); ctx.globalAlpha=1-Math.max(0,(b.t-1.5)/1);
-    ctx.fillStyle='#fff'; ctx.fillRect(x-w/2,y,w,h);
-    ctx.beginPath(); ctx.moveTo(x,y+h); ctx.lineTo(x-8,y+h+10); ctx.lineTo(x+8,y+h+10); ctx.closePath(); ctx.fill();
-    ctx.fillStyle='#111'; ctx.fillText(b.text,x-w/2+pad,y+6); ctx.restore();
+  // enemigos
+  for(const e of enemies){
+    const x=Math.floor(e.x-camX),y=e.y;
+    if(imgEnemy.complete){
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x+24,y+24,24,0,Math.PI*2);
+      ctx.clip();
+      ctx.drawImage(imgEnemy,x,y,48,48);
+      ctx.restore();
+      ctx.strokeStyle="#fff"; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(x+24,y+24,24,0,Math.PI*2); ctx.stroke();
+    } else {
+      ctx.fillStyle="red"; ctx.fillRect(x,y,48,48);
+    }
   }
 }
-
-/* ====== LOOP ====== */
-let last=0; function loop(ts){ const dt=(ts-last)/1000; last=ts; update(); draw(); requestAnimationFrame(loop); }
-requestAnimationFrame(loop);
 </script>
 </body>
 </html>

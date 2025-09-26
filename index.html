@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Cuervo Turrán</title>
+  <style>
+    :root { --bg:#0b1220; --ink:#e6edf7; --btn:#1f2b46; --jump:#2f6dd2; }
+    * { box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin:0; height:100%; background:var(--bg); color:var(--ink); }
+    #wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:8px; padding:8px; }
+    canvas { background:linear-gradient(#7ec8ff,#4a7ed1); border-radius:16px; width:100%; max-width:800px; touch-action:none; }
+    #pad { position:fixed; left:0; right:0; bottom:calc(12px + env(safe-area-inset-bottom)); display:flex; justify-content:space-between; align-items:center; padding:0 14px; gap:12px; }
+    #pad button { font-size:22px; width:80px; height:80px; border-radius:18px; border:0; opacity:.95; box-shadow:0 8px 18px rgba(0,0,0,.25); }
+    #left, #right { background:var(--btn); color:#fff; }
+    #jump { background:var(--jump); color:#fff; }
+    #msg { font:600 14px/1.2 system-ui, -apple-system, Segoe UI, Roboto; opacity:.9; text-align:center; }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <canvas id="game" width="512" height="288" aria-label="Juego del Cuervo Turrán"></canvas>
+    <div id="msg">Toca ◄ ► para moverte y ⤒ para el salto torpe 🐦‍⬛</div>
+  </div>
+
+  <div id="pad">
+    <button id="left"  aria-label="Izquierda">◄</button>
+    <button id="jump"  aria-label="Saltar">⤒</button>
+    <button id="right" aria-label="Derecha">►</button>
+  </div>
+
+<script>
+// Config
+const SPRITE_URL = "turran_sprite.png"; // 4 frames, 64x64 cada uno
+const FRAMES = 4;
+const DEST_W = 64, DEST_H = 64;
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d', { alpha:false });
+
+function fitCanvas() {
+  const vw = innerWidth, vh = innerHeight;
+  const scale = Math.min(vw / canvas.width, (vh - 160) / canvas.height);
+  canvas.style.width = (canvas.width * scale) + 'px';
+  canvas.style.height= (canvas.height* scale) + 'px';
+}
+addEventListener('resize', fitCanvas);
+
+// Controles
+const touch = { left:false, right:false, jump:false };
+const keys = Object.create(null);
+for (const id of ['left','right','jump']) {
+  const el = document.getElementById(id);
+  el.addEventListener('touchstart', e=>{ e.preventDefault(); touch[id]=true; });
+  el.addEventListener('touchend',   e=>{ e.preventDefault(); touch[id]=false; });
+  el.addEventListener('touchcancel',e=>{ e.preventDefault(); touch[id]=false; });
+}
+addEventListener('keydown', e=> keys[e.key.toLowerCase()] = true);
+addEventListener('keyup',   e=> keys[e.key.toLowerCase()] = false);
+
+// Juego
+const GRAV = 0.45, SPEED = 2.2, JUMP_V = -9.8, FLUTTER = -0.6;
+let x = 60, y = 224, vy = 0, dir = 1, onGround = true, anim = 0, t = 0;
+let FRAME_W = 64, FRAME_H = 64; // coinciden con el sprite
+
+const img = new Image();
+img.onload = () => { y = 224 - DEST_H; fitCanvas(); requestAnimationFrame(loop); };
+img.src = SPRITE_URL;
+
+function input() {
+  const left  = keys['arrowleft'] || keys['a'] || touch.left;
+  const right = keys['arrowright']|| keys['d'] || touch.right;
+  const wantJump = keys[' '] || keys['w'] || keys['arrowup'] || touch.jump;
+
+  if (left)  { x -= SPEED; dir = -1; }
+  if (right) { x += SPEED; dir =  1; }
+  if (wantJump && onGround) { vy = JUMP_V; onGround = false; }
+  else if (wantJump && !onGround && vy > -2) { vy += FLUTTER * 0.4; }
+}
+
+function physics() {
+  vy += GRAV; y += vy;
+  const groundY = 224 - DEST_H;
+  if (y > groundY) { y = groundY; vy = 0; onGround = true; }
+  x = Math.max(0, Math.min(x, canvas.width - DEST_W));
+}
+
+function animate(dt) {
+  const moving = (keys['arrowleft']||keys['a']||touch.left) || (keys['arrowright']||keys['d']||touch.right);
+  if (!onGround) anim = vy < -1 ? 2 : 3;
+  else if (moving) { t += dt; anim = 1; y += Math.sin(t*12) * 0.2; }
+  else anim = 0;
+}
+
+function draw() {
+  // Fondo y suelo simples
+  ctx.fillStyle = '#0b1220'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = '#7ec8ff'; ctx.fillRect(16,16,canvas.width-32,canvas.height-96);
+  ctx.fillStyle = '#5bbf4a'; ctx.fillRect(16,canvas.height-96,canvas.width-32,32);
+  ctx.fillStyle = '#6d5139'; ctx.fillRect(16,canvas.height-64,canvas.width-32,16);
+
+  // Sombra
+  ctx.globalAlpha = 0.25;
+  ctx.beginPath();
+  ctx.ellipse(x+DEST_W/2, (224-DEST_H)+DEST_H, 16, 6, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // Dibujo del frame
+  const sx = Math.floor(anim) * FRAME_W, sy = 0;
+  ctx.save();
+  ctx.translate(x + (dir === -1 ? DEST_W : 0), y);
+  ctx.scale(dir, 1);
+  ctx.drawImage(img, sx, sy, FRAME_W, FRAME_H, 0, 0, DEST_W, DEST_H);
+  ctx.restore();
+}
+
+let last = 0;
+function loop(ts) {
+  const dt = Math.min(0.05, (ts - last) / 1000); last = ts;
+  input(); physics(); animate(dt); draw();
+  requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

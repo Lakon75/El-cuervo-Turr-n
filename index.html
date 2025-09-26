@@ -2,125 +2,133 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
-  <title>Cuervo Turrán</title>
+  <title>El Cuervo Turrán</title>
   <style>
-    :root { --bg:#0b1220; --ink:#e6edf7; --btn:#1f2b46; --jump:#2f6dd2; }
-    * { box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
-    html, body { margin:0; height:100%; background:var(--bg); color:var(--ink); }
-    #wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:8px; padding:8px; }
-    canvas { background:linear-gradient(#7ec8ff,#4a7ed1); border-radius:16px; width:100%; max-width:800px; touch-action:none; }
-    #pad { position:fixed; left:0; right:0; bottom:calc(12px + env(safe-area-inset-bottom)); display:flex; justify-content:space-between; align-items:center; padding:0 14px; gap:12px; }
-    #pad button { font-size:22px; width:80px; height:80px; border-radius:18px; border:0; opacity:.95; box-shadow:0 8px 18px rgba(0,0,0,.25); }
-    #left, #right { background:var(--btn); color:#fff; }
-    #jump { background:var(--jump); color:#fff; }
-    #msg { font:600 14px/1.2 system-ui, -apple-system, Segoe UI, Roboto; opacity:.9; text-align:center; }
+    body { margin:0; background:#111; overflow:hidden; }
+    canvas { display:block; margin:auto; background:#87ceeb; }
+    #controls {
+      position:fixed; bottom:20px; left:0; right:0;
+      display:flex; justify-content:center; gap:20px;
+    }
+    button {
+      width:60px; height:60px; border:none;
+      border-radius:10px; font-size:24px;
+    }
+    #left,#right { background:#333; color:white; }
+    #jump { background:#007bff; color:white; }
+    #score {
+      position:fixed; top:10px; left:10px;
+      font-size:20px; color:white; font-family:sans-serif;
+    }
   </style>
 </head>
 <body>
-  <div id="wrap">
-    <canvas id="game" width="512" height="288" aria-label="Juego del Cuervo Turrán"></canvas>
-    <div id="msg">Toca ◄ ► para moverte y ⤒ para el salto torpe 🐦‍⬛</div>
+  <div id="score">Puntos: 0</div>
+  <canvas id="game" width="480" height="270"></canvas>
+  <div id="controls">
+    <button id="left">◄</button>
+    <button id="jump">⤒</button>
+    <button id="right">►</button>
   </div>
-
-  <div id="pad">
-    <button id="left"  aria-label="Izquierda">◄</button>
-    <button id="jump"  aria-label="Saltar">⤒</button>
-    <button id="right" aria-label="Derecha">►</button>
-  </div>
-
 <script>
-// Config
-const SPRITE_URL = "turran_sprite.png"; // 4 frames, 64x64 cada uno
-const FRAMES = 4;
-const DEST_W = 64, DEST_H = 64;
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
 
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d', { alpha:false });
+let keys={left:false,right:false,jump:false};
+document.getElementById("left").ontouchstart=()=>keys.left=true;
+document.getElementById("left").ontouchend=()=>keys.left=false;
+document.getElementById("right").ontouchstart=()=>keys.right=true;
+document.getElementById("right").ontouchend=()=>keys.right=false;
+document.getElementById("jump").ontouchstart=()=>keys.jump=true;
+document.getElementById("jump").ontouchend=()=>keys.jump=false;
+document.addEventListener("keydown",e=>{
+  if(e.key==="ArrowLeft") keys.left=true;
+  if(e.key==="ArrowRight") keys.right=true;
+  if(e.key==="ArrowUp") keys.jump=true;
+});
+document.addEventListener("keyup",e=>{
+  if(e.key==="ArrowLeft") keys.left=false;
+  if(e.key==="ArrowRight") keys.right=false;
+  if(e.key==="ArrowUp") keys.jump=false;
+});
 
-function fitCanvas() {
-  const vw = innerWidth, vh = innerHeight;
-  const scale = Math.min(vw / canvas.width, (vh - 160) / canvas.height);
-  canvas.style.width = (canvas.width * scale) + 'px';
-  canvas.style.height= (canvas.height* scale) + 'px';
+// personaje
+const player={x:50,y:200,w:32,h:32,vy:0,onGround:false,score:0,life:3};
+const gravity=0.8;
+const ground=240;
+
+// enemigos
+let enemies=[];
+
+// sprites
+const img=new Image();
+img.src="turran_sprite.png";
+
+function spawnEnemy(){
+  enemies.push({x:canvas.width+50,y:ground-32,w:32,h:32});
 }
-addEventListener('resize', fitCanvas);
+setInterval(spawnEnemy,3000);
 
-// Controles
-const touch = { left:false, right:false, jump:false };
-const keys = Object.create(null);
-for (const id of ['left','right','jump']) {
-  const el = document.getElementById(id);
-  el.addEventListener('touchstart', e=>{ e.preventDefault(); touch[id]=true; });
-  el.addEventListener('touchend',   e=>{ e.preventDefault(); touch[id]=false; });
-  el.addEventListener('touchcancel',e=>{ e.preventDefault(); touch[id]=false; });
-}
-addEventListener('keydown', e=> keys[e.key.toLowerCase()] = true);
-addEventListener('keyup',   e=> keys[e.key.toLowerCase()] = false);
+// bucle
+function loop(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
-// Juego
-const GRAV = 0.45, SPEED = 2.2, JUMP_V = -9.8, FLUTTER = -0.6;
-let x = 60, y = 224, vy = 0, dir = 1, onGround = true, anim = 0, t = 0;
-let FRAME_W = 64, FRAME_H = 64; // coinciden con el sprite
+  // suelo
+  ctx.fillStyle="#228B22";
+  ctx.fillRect(0,ground,canvas.width,canvas.height-ground);
 
-const img = new Image();
-img.onload = () => { y = 224 - DEST_H; fitCanvas(); requestAnimationFrame(loop); };
-img.src = SPRITE_URL;
+  // control jugador
+  if(keys.left) player.x-=3;
+  if(keys.right) player.x+=3;
+  if(keys.jump && player.onGround){
+    player.vy=-12; player.onGround=false;
+    // bocadillo
+    ctx.fillStyle="white";
+    ctx.fillRect(player.x-10,player.y-30,80,20);
+    ctx.fillStyle="black";
+    ctx.fillText("PARAPARAA!!",player.x-5,player.y-15);
+  }
 
-function input() {
-  const left  = keys['arrowleft'] || keys['a'] || touch.left;
-  const right = keys['arrowright']|| keys['d'] || touch.right;
-  const wantJump = keys[' '] || keys['w'] || keys['arrowup'] || touch.jump;
+  player.vy+=gravity;
+  player.y+=player.vy;
+  if(player.y+player.h>=ground){
+    player.y=ground-player.h;
+    player.vy=0;
+    player.onGround=true;
+  }
 
-  if (left)  { x -= SPEED; dir = -1; }
-  if (right) { x += SPEED; dir =  1; }
-  if (wantJump && onGround) { vy = JUMP_V; onGround = false; }
-  else if (wantJump && !onGround && vy > -2) { vy += FLUTTER * 0.4; }
-}
+  // dibujar jugador
+  ctx.drawImage(img,0,0,32,32,player.x,player.y,32,32);
 
-function physics() {
-  vy += GRAV; y += vy;
-  const groundY = 224 - DEST_H;
-  if (y > groundY) { y = groundY; vy = 0; onGround = true; }
-  x = Math.max(0, Math.min(x, canvas.width - DEST_W));
-}
+  // enemigos
+  ctx.fillStyle="red";
+  for(let i=0;i<enemies.length;i++){
+    let en=enemies[i];
+    en.x-=2;
+    ctx.fillRect(en.x,en.y,en.w,en.h);
 
-function animate(dt) {
-  const moving = (keys['arrowleft']||keys['a']||touch.left) || (keys['arrowright']||keys['d']||touch.right);
-  if (!onGround) anim = vy < -1 ? 2 : 3;
-  else if (moving) { t += dt; anim = 1; y += Math.sin(t*12) * 0.2; }
-  else anim = 0;
-}
+    // colisión
+    if(player.x<en.x+en.w && player.x+player.w>en.x &&
+       player.y<en.y+en.h && player.y+player.h>en.y){
+      if(player.vy>0){ // cae encima
+        enemies.splice(i,1); i--;
+        player.score+=10;
+      }else{ // golpe
+        player.life--;
+        if(player.life<=0){
+          alert("GAME OVER");
+          player.score=0; player.life=3;
+        }
+      }
+    }
+  }
 
-function draw() {
-  // Fondo y suelo simples
-  ctx.fillStyle = '#0b1220'; ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle = '#7ec8ff'; ctx.fillRect(16,16,canvas.width-32,canvas.height-96);
-  ctx.fillStyle = '#5bbf4a'; ctx.fillRect(16,canvas.height-96,canvas.width-32,32);
-  ctx.fillStyle = '#6d5139'; ctx.fillRect(16,canvas.height-64,canvas.width-32,16);
+  // marcador
+  document.getElementById("score").innerText="Puntos: "+player.score+" | Vidas: "+player.life;
 
-  // Sombra
-  ctx.globalAlpha = 0.25;
-  ctx.beginPath();
-  ctx.ellipse(x+DEST_W/2, (224-DEST_H)+DEST_H, 16, 6, 0, 0, Math.PI*2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
-
-  // Dibujo del frame
-  const sx = Math.floor(anim) * FRAME_W, sy = 0;
-  ctx.save();
-  ctx.translate(x + (dir === -1 ? DEST_W : 0), y);
-  ctx.scale(dir, 1);
-  ctx.drawImage(img, sx, sy, FRAME_W, FRAME_H, 0, 0, DEST_W, DEST_H);
-  ctx.restore();
-}
-
-let last = 0;
-function loop(ts) {
-  const dt = Math.min(0.05, (ts - last) / 1000); last = ts;
-  input(); physics(); animate(dt); draw();
   requestAnimationFrame(loop);
 }
+loop();
 </script>
 </body>
 </html>

@@ -1,134 +1,179 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>El Cuervo Turrán</title>
-  <style>
-    body { margin:0; background:#111; overflow:hidden; }
-    canvas { display:block; margin:auto; background:#87ceeb; }
-    #controls {
-      position:fixed; bottom:20px; left:0; right:0;
-      display:flex; justify-content:center; gap:20px;
-    }
-    button {
-      width:60px; height:60px; border:none;
-      border-radius:10px; font-size:24px;
-    }
-    #left,#right { background:#333; color:white; }
-    #jump { background:#007bff; color:white; }
-    #score {
-      position:fixed; top:10px; left:10px;
-      font-size:20px; color:white; font-family:sans-serif;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>El cuervo Turrán</title>
+<style>
+  :root{--bg:#0b1220;--ink:#e6edf7;--btn:#1f2b46;--jump:#2f6dd2;}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,Segoe UI,Roboto}
+  #wrap{display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;padding:8px}
+  canvas{background:#6fbaff;border-radius:16px;width:100%;max-width:900px;touch-action:none}
+  #hud{display:flex;gap:16px;align-items:center;font-weight:700}
+  #pad{position:fixed;left:0;right:0;bottom:calc(12px + env(safe-area-inset-bottom));display:flex;justify-content:space-between;align-items:center;padding:0 14px;gap:12px}
+  #pad button{font-size:22px;width:84px;height:84px;border-radius:18px;border:0;opacity:.96;box-shadow:0 8px 18px rgba(0,0,0,.25)}
+  #left,#right{background:var(--btn);color:#fff} #jump{background:var(--jump);color:#fff}
+  #title{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:18px;color:#fff;text-align:center}
+  #title h1{margin:0;font-size:44px;letter-spacing:.5px;text-shadow:0 3px 0 #0b1220}
+  #title p{margin:0 16px;max-width:680px;opacity:.9}
+  #title button{margin-top:4px;font-size:18px;padding:12px 18px;border-radius:12px;border:0;background:#00b37e;color:#071b12;box-shadow:0 10px 20px rgba(0,0,0,.25)}
+</style>
 </head>
 <body>
-  <div id="score">Puntos: 0</div>
-  <canvas id="game" width="480" height="270"></canvas>
-  <div id="controls">
-    <button id="left">◄</button>
-    <button id="jump">⤒</button>
-    <button id="right">►</button>
+<div id="wrap">
+  <div id="hud">Plumas: <span id="score">0</span> · Vidas: <span id="lives">3</span></div>
+  <div id="title">
+    <h1>EL CUERVO TURRÁN</h1>
+    <p>Salta torpemente, sopla “<b>PARAPARAA!!</b>”, esquiva bitxos y cae encima para ganar puntos. ¡Toque para empezar!</p>
+    <button id="startBtn">Tocar para empezar</button>
   </div>
+  <canvas id="game" width="640" height="360"></canvas>
+</div>
+<div id="pad">
+  <button id="left">◄</button>
+  <button id="jump">⤒</button>
+  <button id="right">►</button>
+</div>
+
 <script>
-const canvas=document.getElementById("game");
-const ctx=canvas.getContext("2d");
+// ====== CONFIG ======
+const SPRITE_URL = "turran_sprite.png"; // tu sprite 4x64x64
+const ENEMY_URL  = "enemy.png";         // opcional: tu cara recortada cuadrada (usaré fallback si no está)
+const SCALE_P = 1.5;                    // tamaño Turrán (1.5 ~= 96x96)
+const G=0.55,SPEED=2.8,JUMP=-10.8,FLUTTER=-0.65,CAM_LERP=0.1;
+const groundY=300;
 
-let keys={left:false,right:false,jump:false};
-document.getElementById("left").ontouchstart=()=>keys.left=true;
-document.getElementById("left").ontouchend=()=>keys.left=false;
-document.getElementById("right").ontouchstart=()=>keys.right=true;
-document.getElementById("right").ontouchend=()=>keys.right=false;
-document.getElementById("jump").ontouchstart=()=>keys.jump=true;
-document.getElementById("jump").ontouchend=()=>keys.jump=false;
-document.addEventListener("keydown",e=>{
-  if(e.key==="ArrowLeft") keys.left=true;
-  if(e.key==="ArrowRight") keys.right=true;
-  if(e.key==="ArrowUp") keys.jump=true;
-});
-document.addEventListener("keyup",e=>{
-  if(e.key==="ArrowLeft") keys.left=false;
-  if(e.key==="ArrowRight") keys.right=false;
-  if(e.key==="ArrowUp") keys.jump=false;
-});
+// ====== SETUP ======
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d',{alpha:false});
+const scoreEl=document.getElementById('score');
+const livesEl=document.getElementById('lives');
+const title=document.getElementById('title');
+document.getElementById('startBtn').addEventListener('click',()=>{ start=true; startMusic(); title.style.display='none'; });
 
-// personaje
-const player={x:50,y:200,w:32,h:32,vy:0,onGround:false,score:0,life:3};
-const gravity=0.8;
-const ground=240;
+function fit(){ const s=Math.min(innerWidth/canvas.width,(innerHeight-170)/canvas.height); canvas.style.width=(canvas.width*s)+'px'; canvas.style.height=(canvas.height*s)+'px'; }
+addEventListener('resize',fit); fit();
+
+// ====== ASSETS ======
+const imgPlayer=new Image(); imgPlayer.src=SPRITE_URL;
+const imgEnemy=new Image(); imgEnemy.src=ENEMY_URL; let enemyReady=false;
+imgEnemy.onload=()=>enemyReady=true; imgEnemy.onerror=()=>enemyReady=false;
+
+// ====== INPUT ======
+const k=Object.create(null), touch={left:false,right:false,jump:false};
+addEventListener('keydown',e=>k[e.key.toLowerCase()]=true);
+addEventListener('keyup',e=>k[e.key.toLowerCase()]=false);
+for(const id of ['left','right','jump']){
+  const el=document.getElementById(id);
+  el.addEventListener('touchstart',e=>{e.preventDefault();touch[id]=true;});
+  el.addEventListener('touchend',e=>{e.preventDefault();touch[id]=false;});
+  el.addEventListener('touchcancel',e=>{e.preventDefault();touch[id]=false;});
+}
+
+// ====== AUDIO (chiptune simple) ======
+let A,osc,beat,seqT=0,start=false;
+function startMusic(){
+  if(A) return;
+  A=new (window.AudioContext||window.webkitAudioContext)();
+  osc=A.createOscillator(); beat=A.createOscillator();
+  const g1=A.createGain(), g2=A.createGain(); g1.gain.value=0.05; g2.gain.value=0.02;
+  osc.type='square'; beat.type='triangle';
+  osc.connect(g1); beat.connect(g2); g1.connect(A.destination); g2.connect(A.destination);
+  osc.start(); beat.start();
+  const notes=[262,330,392,523,392,330,294,330,392,440,392,330];
+  (function loop(){
+    if(!A) return;
+    const i=Math.floor(seqT)%notes.length;
+    osc.frequency.setValueAtTime(notes[i],A.currentTime);
+    beat.frequency.setValueAtTime(110 + (i%4)*20,A.currentTime);
+    seqT+=0.5; setTimeout(loop,220);
+  })();
+}
+
+// ====== WORLD ======
+let camX=0, score=0, lives=3, gameOver=false, tGlobal=0;
+const particles=[], bubbles=[], clouds=[], mountains=[];
+for(let i=0;i<8;i++) clouds.push({x:Math.random()*1200, y:40+Math.random()*100, s:0.3+Math.random()*0.5});
+for(let i=0;i<6;i++) mountains.push({x:Math.random()*1600, h:60+Math.random()*80, s:0.1+Math.random()*0.2});
+
+// jugador
+const P={x:40,y:groundY-64,w:64*SCALE_P,h:64*SCALE_P,vx:0,vy:0,onGround:true,dir:1,anim:0,walkT:0};
+function puff(x,y){ particles.push({x,y, vx:(Math.random()-0.5)*1.2, vy:-1.2, a:0.9, r:2+Math.random()*2}); }
+function say(x,y,txt){ bubbles.push({x,y, t:0, text:txt}); }
 
 // enemigos
-let enemies=[];
+const enemies=[];
+function spawnEnemy(x){ enemies.push({x, y:groundY-48, w:48, h:48, vx:-1.4, alive:true}); }
+let nextEnemy=140;
 
-// sprites
-const img=new Image();
-img.src="turran_sprite.png";
+// ====== HELPERS ======
+function rects(a,b){ return a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h && a.y+a.h>b.y; }
 
-function spawnEnemy(){
-  enemies.push({x:canvas.width+50,y:ground-32,w:32,h:32});
-}
-setInterval(spawnEnemy,3000);
+// ====== UPDATE ======
+function update(){
+  if(!start || gameOver) return;
+  const left=k['arrowleft']||k['a']||touch.left;
+  const right=k['arrowright']||k['d']||touch.right;
+  const wantJump=k[' ']||k['w']||k['arrowup']||touch.jump;
 
-// bucle
-function loop(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+  P.vx=(right?SPEED:0)-(left?SPEED:0);
+  if(left) P.dir=-1; if(right) P.dir=1;
 
-  // suelo
-  ctx.fillStyle="#228B22";
-  ctx.fillRect(0,ground,canvas.width,canvas.height-ground);
+  if(wantJump && P.onGround){ P.vy=JUMP; P.onGround=false; say(P.x+P.w/2,P.y-8,"PARAPARAA!!"); }
+  else if(wantJump && !P.onGround && P.vy>-2){ P.vy+=FLUTTER*0.4; }
 
-  // control jugador
-  if(keys.left) player.x-=3;
-  if(keys.right) player.x+=3;
-  if(keys.jump && player.onGround){
-    player.vy=-12; player.onGround=false;
-    // bocadillo
-    ctx.fillStyle="white";
-    ctx.fillRect(player.x-10,player.y-30,80,20);
-    ctx.fillStyle="black";
-    ctx.fillText("PARAPARAA!!",player.x-5,player.y-15);
-  }
+  P.vy+=G; P.x+=P.vx; P.y+=P.vy;
+  if(P.y+P.h>groundY){ P.y=groundY-P.h; if(!P.onGround) puff(P.x+P.w/2, groundY-2); P.vy=0; P.onGround=true; }
 
-  player.vy+=gravity;
-  player.y+=player.vy;
-  if(player.y+player.h>=ground){
-    player.y=ground-player.h;
-    player.vy=0;
-    player.onGround=true;
-  }
+  // anim / soplido al caminar
+  if(!P.onGround) P.anim=P.vy<-1?2:3;
+  else if(P.vx!==0){ P.anim=1; P.walkT+=0.18; if(Math.sin(P.walkT)>0.92) puff(P.x+P.w/2, groundY-2); }
+  else P.anim=0;
 
-  // dibujar jugador
-  ctx.drawImage(img,0,0,32,32,player.x,player.y,32,32);
+  // cámara
+  camX+=( (P.x-220) - camX )*CAM_LERP;
 
   // enemigos
-  ctx.fillStyle="red";
-  for(let i=0;i<enemies.length;i++){
-    let en=enemies[i];
-    en.x-=2;
-    ctx.fillRect(en.x,en.y,en.w,en.h);
-
-    // colisión
-    if(player.x<en.x+en.w && player.x+player.w>en.x &&
-       player.y<en.y+en.h && player.y+player.h>en.y){
-      if(player.vy>0){ // cae encima
-        enemies.splice(i,1); i--;
-        player.score+=10;
-      }else{ // golpe
-        player.life--;
-        if(player.life<=0){
-          alert("GAME OVER");
-          player.score=0; player.life=3;
-        }
-      }
+  nextEnemy--; if(nextEnemy<=0){ spawnEnemy(camX+640+Math.random()*200); nextEnemy=120+Math.random()*120|0; }
+  for(const e of enemies){
+    if(!e.alive) continue;
+    e.x+=e.vx;
+    if(rects(P,e)){
+      if(P.vy>1){ e.alive=false; score+=10; scoreEl.textContent=score; P.vy=JUMP*0.5; say(e.x,e.y-6,"¡AY!"); }
+      else{ lives--; livesEl.textContent=lives; say(P.x,P.y-10,"¡AU!"); P.x-=32; P.vy=-7; if(lives<=0){ gameOver=true; say(P.x,P.y-24,"GAME OVER"); } }
     }
   }
 
-  // marcador
-  document.getElementById("score").innerText="Puntos: "+player.score+" | Vidas: "+player.life;
+  // burbujas
+  for(const b of bubbles) b.t+=0.03;
+  while(bubbles.length && bubbles[0].t>2.5) bubbles.shift();
 
-  requestAnimationFrame(loop);
+  // partículas
+  for(const p of particles){ p.x+=p.vx; p.y+=p.vy; p.a-=0.03; p.vy+=0.05; }
+  while(particles.length && particles[0].a<=0) particles.shift();
+
+  tGlobal++;
 }
-loop();
-</script>
-</body>
-</html>
+
+// ====== DRAW ======
+function draw(){
+  // cielo
+  const grd=ctx.createLinearGradient(0,0,0,canvas.height);
+  grd.addColorStop(0,'#86d3ff'); grd.addColorStop(1,'#5aa8f0');
+  ctx.fillStyle=grd; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // montañas lejanas
+  for(const m of mountains){ const x=((m.x - camX*m.s)%1200+1200)%1200 - 200;
+    ctx.fillStyle='#6fa4c9'; ctx.beginPath(); ctx.moveTo(x,groundY-8); ctx.lineTo(x+140,groundY-8); ctx.lineTo(x+70,groundY-8-m.h); ctx.closePath(); ctx.fill(); }
+
+  // nubes
+  ctx.fillStyle='rgba(255,255,255,.9)';
+  for(const c of clouds){ c.x+=c.s*0.3; const x=((c.x - camX*c.s)%1000+1000)%1000;
+    ctx.beginPath(); ctx.ellipse(x, c.y, 40,18,0,0,Math.PI*2); ctx.ellipse(x+28,c.y+4,32,14,0,0,Math.PI*2); ctx.fill(); }
+
+  // suelo texturizado
+  const start=Math.floor(camX/32)*32-64;
+  for(let x=start;x<camX+canvas.width+64;x+=32){
+    // tierra
+    ctx.fillStyle='#6d5139'; ctx.fillRect(Math.floor(x-camX), groundY-

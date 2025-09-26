@@ -1,27 +1,26 @@
-<!DOCTYPE html>
+    <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>El cuervo Turrán</title>
 <style>
-  body { margin:0; background:#111; font-family:sans-serif; }
+  body { margin:0; background:#000; font-family:sans-serif; text-align:center; }
   #game { display:none; background:#6ec6ff; margin:auto; border:3px solid #000; border-radius:10px; }
   #pad { display:none; position:fixed; bottom:20px; left:0; right:0; display:flex; justify-content:center; gap:20px; }
   #pad button { width:80px; height:80px; font-size:32px; border-radius:20px; border:none; background:#333; color:white; }
   #intro, #gameover { position:fixed; top:0; left:0; right:0; bottom:0; display:flex; flex-direction:column; justify-content:center; align-items:center; background:#000; color:#fff; z-index:5; }
-  #intro h1 { font-size:42px; margin-bottom:20px; }
-  #intro img { max-width:300px; border-radius:12px; margin-bottom:20px; }
+  #intro img { max-width:90%; border-radius:12px; margin-bottom:20px; }
   #intro button, #gameover button { padding:12px 24px; font-size:22px; margin-top:20px; }
-  #gameover h1 { font-size:40px; color:red; margin-bottom:20px; text-align:center; }
+  #gameover h1 { font-size:40px; color:red; margin-bottom:20px; }
 </style>
 </head>
 <body>
 
 <!-- Intro -->
 <div id="intro">
-  <h1>🐦 El cuervo Turrán 🐦</h1>
   <img src="turran_moto.png" alt="Turrán en moto">
+  <h1>🐦 El cuervo Turrán 🐦</h1>
   <button onclick="startGame()">Comenzar</button>
 </div>
 
@@ -37,24 +36,23 @@
 
 <!-- Pantalla Game Over -->
 <div id="gameover" style="display:none;">
-  <h1>Game Over<br>Esto y lo Otro</h1>
+  <h1>GAME OVER<br>ESTO Y LO OTRO</h1>
   <button onclick="restartGame()">Reintentar</button>
 </div>
 
 <script>
 const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
-let keys={},player,enemies,camX,running;
-let music;
+let keys={},player,enemies,camX,running,music;
 
 const imgPlayer=new Image();
-imgPlayer.src="turran_sprite.png";  // sprite del cuervo
+imgPlayer.src="turran_sprite.png";  // Sprite del cuervo
 const imgEnemy=new Image();
-imgEnemy.src="txibiri.png";         // enemigo
+imgEnemy.src="txibiri.png";         // Enemigo
 
 function playMusic(){
-  music=new Audio("https://actions.google.com/sounds/v1/cartoon/cartoon_boing.ogg");
-  music.loop=true; music.volume=0.4;
+  music=new Audio("https://www.bensound.com/bensound-music/bensound-epic.mp3");
+  music.loop=true; music.volume=0.5;
   music.play().catch(()=>{});
 }
 
